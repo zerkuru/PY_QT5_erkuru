@@ -49,10 +49,7 @@ def handle_message(message):
             CONFIGURATIONS.get('ERROR'): 'Bad Request'
         }
 
-
-def main():
-    global CONFIGURATIONS
-    CONFIGURATIONS = load_configuration()
+def checkport():
     try:
         if '-p' in sys.argv:
             listen_port = int(sys.argv[sys.argv.index('-p') + 1])
@@ -68,6 +65,7 @@ def main():
             'Значение порта должно быть в пределах от 1024 до 65535')
         sys.exit(1)
 
+def checkaddress():
     try:
         if '-a' in sys.argv:
             listen_address = sys.argv[sys.argv.index('-a') + 1]
@@ -79,6 +77,7 @@ def main():
             'После \'a\'- необходимо указать адрес для ')
         sys.exit(1)
 
+def messageexchange():
     transport = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     transport.bind((listen_address, listen_port))
 
@@ -95,6 +94,13 @@ def main():
             print('Принято некорретное сообщение от клиента')
             client.close()
 
+
+def main():
+    global CONFIGURATIONS
+    CONFIGURATIONS = load_configuration()
+    checkport()
+    checkaddress()
+    messageexchange()
 
 if __name__ == '__main__':
     main()

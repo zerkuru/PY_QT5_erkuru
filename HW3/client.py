@@ -3,7 +3,7 @@ import sys
 import socket
 import time
 
-from utils import load_configurations, send_message, get_message
+from utils import load_configuration, get_message, send_message, load_authentification
 
 CONFIGURATIONS = dict()
 
@@ -26,10 +26,7 @@ def handle_response(message):
         return f'400 : {message[CONFIGURATIONS.get("ERROR")]}'
     raise ValueError
 
-
-def main():
-    global CONFIGURATIONS
-    CONFIGURATIONS = load_CONFIGURATIONS(on_server=False)
+def checkport():
     try:
         server_address = sys.argv[1]
         server_port = int(sys.argv[2])
@@ -42,6 +39,7 @@ def main():
         print('Порт должен быть в пределах от 1024 до 65535')
         sys.exit(1)
 
+def messageexchange():
     transport = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     transport.connect((server_address, server_port))
     presence_message = create_presence_message('Guest')
@@ -53,6 +51,12 @@ def main():
         print(hanlded_response)
     except (ValueError, json.JSONDecodeError):
         print('Ошибка декодирования сообщения')
+
+def main():
+    global CONFIGURATIONS
+    CONFIGURATIONS = load_configuration(on_server=False)
+    checkport()
+    messageexchange()
 
 
 if __name__ == '__main__':
