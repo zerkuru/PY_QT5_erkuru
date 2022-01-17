@@ -3,10 +3,10 @@ import os
 import sys
 
 def load_authentification(on_server=True):
-    if not os.path.exists('auth.json'):
+    if not os.path.exists('../auth.json'):
         print('Не найден файл аутентификации')
         sys.exit(True)
-    with open('auth.json') as auth_file:
+    with open('../auth.json') as auth_file:
         AUTHENTIFICATIONS = json.load(auth_file)
     return AUTHENTIFICATIONS
 
@@ -26,10 +26,10 @@ def load_configuration(on_server=True):
     ]
     if not on_server:
         configuration_keys.append('DEFAULT_IP_ADDRESS')
-    if not os.path.exists('config.json'):
+    if not os.path.exists('../config.json'):
         print('Не найден файл конфигурации')
         sys.exit(True)
-    with open('config.json') as configuration_file:
+    with open('../config.json') as configuration_file:
         CONFIGURATIONS = json.load(configuration_file)
     loaded_configuration_keys = list(CONFIGURATIONS.keys())
     for key in configuration_keys:

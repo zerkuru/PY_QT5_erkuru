@@ -21,3 +21,4 @@ log.critical("Can't connect to %(host)s at port %(port)d", parms)
 
 log.addHandler(logging.TimedRotatingFileHandler(filename='client.log', when='D', interval=1, backupCount=10))
 
+

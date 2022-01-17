@@ -2,7 +2,7 @@ import json
 import sys
 import socket
 
-from utils import load_configuration, get_message, send_message, load_authentification
+from utils.utils import load_configuration, get_message, send_message
 
 CONFIGURATIONS = dict()
 AUTHENTIFICATIONS = dict()
@@ -95,6 +95,7 @@ def messageexchange():
             client.close()
 
 
+
 def main():
     global CONFIGURATIONS
     CONFIGURATIONS = load_configuration()
@@ -104,3 +105,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
