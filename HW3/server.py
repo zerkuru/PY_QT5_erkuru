@@ -1,11 +1,14 @@
 import json
 import sys
 import socket
-
+import logging
+import log.server_log_config
 from utils.utils import load_configuration, get_message, send_message
 
 CONFIGURATIONS = dict()
 AUTHENTIFICATIONS = dict()
+
+SERVER_LOGGER = log.server_log_config.LOGGER
 
 
 def handle_authentification(message):
@@ -56,11 +59,16 @@ def checkport():
         else:
             listen_port = CONFIGURATIONS.get('DEFAULT_PORT')
         if not 65535 >= listen_port >= 1024:
+            SERVER_LOGGER.error("Ошибка в номере порта")
             raise ValueError
+
     except IndexError:
+        SERVER_LOGGER.error("нет порта")
         print('После -\'p\' необходимо указать порт')
         sys.exit(1)
+
     except ValueError:
+        SERVER_LOGGER.error("Номер порта за пределами значений")
         print(
             'Значение порта должно быть в пределах от 1024 до 65535')
         sys.exit(1)
@@ -71,7 +79,7 @@ def checkaddress():
             listen_address = sys.argv[sys.argv.index('-a') + 1]
         else:
             listen_address = ''
-
+   SERVER_LOGGER.critical("Не указан адрес")
     except IndexError:
         print(
             'После \'a\'- необходимо указать адрес для ')
@@ -90,7 +98,9 @@ def messageexchange():
             response_message = handle_message(message)
             send_message(client, response_message, CONFIGURATIONS)
             client.close()
+
         except (ValueError, json.JSONDecodeError):
+            SERVER_LOGGER.error("Некорректное сообщение от клиента")
             print('Принято некорретное сообщение от клиента')
             client.close()
 

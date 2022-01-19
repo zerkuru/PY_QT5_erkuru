@@ -2,10 +2,13 @@ import json
 import sys
 import socket
 import time
+import logging
+import log.client_log_config
 
 from utils import load_configuration, get_message, send_message, load_authentification
 
 CONFIGURATIONS = dict()
+CLIENT_LOG = log.client_log_config.LOGGER
 
 
 def create_presence_message(account_name):
@@ -24,6 +27,7 @@ def handle_response(message):
         if message[CONFIGURATIONS.get('RESPONSE')] == 200:
             return '200 : OK'
         return f'400 : {message[CONFIGURATIONS.get("ERROR")]}'
+    CLIENT_LOG.error("Неверный ответ сервера")
     raise ValueError
 
 def checkport():
@@ -33,9 +37,11 @@ def checkport():
         if not 65535 >= server_port >= 1024:
             raise ValueError
     except IndexError:
+        CLIENT_LOG.error("Неверный адрес сервера")
         server_address = CONFIGURATIONS.get('DEFAULT_IP_ADDRESS')
         server_port = CONFIGURATIONS.get('DEFAULT_PORT')
     except ValueError:
+        CLIENT_LOG.error("Неверный порт сервера")
         print('Порт должен быть в пределах от 1024 до 65535')
         sys.exit(1)
 
@@ -50,6 +56,7 @@ def messageexchange():
         print(f'Ответ от сервера: {response}')
         print(hanlded_response)
     except (ValueError, json.JSONDecodeError):
+        CLIENT_LOG.error("Ошибка декодирования")
         print('Ошибка декодирования сообщения')
 
 def main():

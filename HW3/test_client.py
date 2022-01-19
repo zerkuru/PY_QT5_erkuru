@@ -3,6 +3,11 @@ import unittest
 import client
 import sys
 import time
+import logging
+import log.client_log_config
+
+
+CLIENT_LOGGER = log.client_log_config.LOGGER
 
 class TestCheckPort(unittest.TestCase):
     # проверка порта
