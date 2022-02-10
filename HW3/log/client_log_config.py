@@ -26,7 +26,7 @@ LOGGER.addHandler(HANDLER)
 LOGGER.addHandler(L_FILE)
 LOGGER.setLevel(CONFIGURATIONS.get('LOGGING_LEVEL', logging.DEBUG))
 
-if __name__ = '__main__':
+if __name__ == '__main__':
     LOGGER.critical("Критическая ошибка: ")
     LOGGER.error("Ошибка: ")
     LOGGER.debug("Отладочная информация: ")
