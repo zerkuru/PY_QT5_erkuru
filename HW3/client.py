@@ -1,16 +1,16 @@
 """Программа-клиент"""
 
 import logging
-import logs.config_client_log
+import log.client_log_config
 import argparse
 import sys
 import os
-from Cryptodome.PublicKey import RSA
+import Cryptodome.PublicKey
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
-from common.variables import *
-from common.errors import ServerError
-from common.decos import log
+from utils.variables import *
+from utils.errors import ServerError
+from utils.decos import log
 from client.database import ClientDatabase
 from client.transport import ClientTransport
 from client.main_window import ClientMainWindow
