@@ -1,119 +1,198 @@
-import json
-import sys
+"""Программа-сервер"""
 import socket
+import sys
+import argparse
+import json
 import logging
+import select
+import time
+import threading
 import log.server_log_config
-from utils.utils import load_configuration, get_message, send_message
+from utils.variables import *
+from utils.utils import *
+from decos import log
+from descriptors import Port
+from metaclasses import ServerMaker
+from server_database import ServerStorage
 
-CONFIGURATIONS = dict()
-AUTHENTIFICATIONS = dict()
+# Инициализация логирования сервера.
+logger = logging.getLogger('server')
+# Парсер аргументов коммандной строки.
+@log
+def arg_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', default=DEFAULT_PORT, type=int, nargs='?')
+    parser.add_argument('-a', default='', nargs='?')
+    namespace = parser.parse_args(sys.argv[1:])
+    listen_address = namespace.a
+    listen_port = namespace.p
+    return listen_address, listen_port
 
-SERVER_LOGGER = log.server_log_config.LOGGER
+
+# Основной класс сервера
+class Server(threading.Thread, metaclass=ServerMaker):
+    port = Port()
+
+    def __init__(self, listen_address, listen_port, database):
+
+        self.addr = listen_address
+        self.port = listen_port
+        self.database = database
+        self.clients = []
+        self.messages = []
+        self.names = dict()
+        super().__init__()
+
+    def init_socket(self):
+        logger.info(
+            f'Запущен сервер, порт для подключений: {self.port} , адрес с которого принимаются подключения: {self.addr}. Если адрес не указан, принимаются соединения с любых адресов.')
+        # Готовим сокет
+        transport = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        transport.bind((self.addr, self.port))
+        transport.settimeout(0.5)
+
+        self.sock = transport
+        self.sock.listen()
+
+    def main_loop(self):
+        def run(self):
+            self.init_socket()
+
+            while True:
+
+                try:
+                    client, client_address = self.sock.accept()
+                except OSError:
+                    pass
+            else:
+                logger.info(f'Установлено соедение с ПК {client_address}')
+                self.clients.append(client)
+            recv_data_lst = []
+            send_data_lst = []
+            err_lst = []
+            try:
+                if self.clients:
+                    recv_data_lst, send_data_lst, err_lst = select.select(self.clients, self.clients, [], 0)
+            except OSError:
+                pass
 
 
-def handle_authentification(message):
-    response = {
-        "RESPONSE_NUMBER": 404,
-        "ERROR_MESSAGE": "user not found"
-    }
-    if message[CONFIGURATIONS.get('USER')][CONFIGURATIONS.get('ACCOUNT_NAME')] in AUTHENTIFICATIONS:
-        if AUTHENTIFICATIONS[[CONFIGURATIONS.get('USER')][CONFIGURATIONS.get('ACCOUNT_NAME')]] == \
-            message[CONFIGURATIONS.get('USER')][CONFIGURATIONS.get('PASSWORD')]:
-            response["RESPONSE_NUMBER"] = 202
-            response["ERROR_MESSAGE"] = ""
+            if recv_data_lst:
+                for client_with_message in recv_data_lst:
+                    try:
+                        self.process_client_message(get_message(client_with_message), client_with_message)
+                    except:
+                        logger.info(f'Клиент {client_with_message.getpeername()} отключился от сервера.')
+                        self.clients.remove(client_with_message)
+
+
+            for message in self.messages:
+                try:
+                    self.process_message(message, send_data_lst)
+                except:
+                    logger.info(f'Связь с клиентом с именем {message[DESTINATION]} была потеряна')
+                    self.clients.remove(self.names[message[DESTINATION]])
+                    del self.names[message[DESTINATION]]
+            self.messages.clear()
+
+
+    def process_message(self, message, listen_socks):
+        if message[DESTINATION] in self.names and self.names[message[DESTINATION]] in listen_socks:
+            send_message(self.names[message[DESTINATION]], message)
+            logger.info(f'Отправлено сообщение пользователю {message[DESTINATION]} от пользователя {message[SENDER]}.')
+        elif message[DESTINATION] in self.names and self.names[message[DESTINATION]] not in listen_socks:
+            raise ConnectionError
         else:
-            response["RESPONSE_NUMBER"] = 402
-            response["ERROR_MESSAGE"] = "wrong login password"
-    else:
-        response["RESPONSE_NUMBER"] = 404
-        response["ERROR_MESSAGE"] = "user not found"
-    return response
+            logger.error(
+                f'Пользователь {message[DESTINATION]} не зарегистрирован на сервере, отправка сообщения невозможна.')
 
 
-def handle_message(message):
-    if CONFIGURATIONS.get('ACTION') in message \
-            and message[CONFIGURATIONS.get('ACTION')] == CONFIGURATIONS.get('PRESENCE') \
-            and CONFIGURATIONS.get('TIME') in message \
-            and CONFIGURATIONS.get('USER') in message \
-            and message[CONFIGURATIONS.get('USER')][CONFIGURATIONS.get('ACCOUNT_NAME')] == 'Guest':
-        return {CONFIGURATIONS.get('RESPONSE'): 200}
-    elif CONFIGURATIONS.get('ACTION') in message \
-             and message[CONFIGURATIONS.get('ACTION')] == CONFIGURATIONS.get('AUTHENTIFICATION') \
-             and CONFIGURATIONS.get('TIME') in message \
-             and CONFIGURATIONS.get('USER') in message:
-        response = handle_authentification(message)
-        return {
-            CONFIGURATIONS.get('RESPONSE'): response.get('RESPONSE_NUMBER'),
-            CONFIGURATIONS.get('ERROR'): response.get('ERROR_MESSAGE')
-        }
-    else:
-        return {
-            CONFIGURATIONS.get('RESPONSE'): 400,
-            CONFIGURATIONS.get('ERROR'): 'Bad Request'
-        }
+    def process_client_message(self, message, client):
+        logger.debug(f'Разбор сообщения от клиента : {message}')
 
-def checkport():
-    try:
-        if '-p' in sys.argv:
-            listen_port = int(sys.argv[sys.argv.index('-p') + 1])
+        if ACTION in message and message[ACTION] == PRESENCE and TIME in message and USER in message:
+
+            if message[USER][ACCOUNT_NAME] not in self.names.keys():
+                self.names[message[USER][ACCOUNT_NAME]] = client
+                client_ip, client_port = client.getpeername()
+                self.database.user_login(message[USER][ACCOUNT_NAME], client_ip, client_port)
+                send_message(client, RESPONSE_200)
+            else:
+                response = RESPONSE_400
+                response[ERROR] = 'Имя пользователя уже занято.'
+                send_message(client, response)
+                self.clients.remove(client)
+                client.close()
+            return
+
+        elif ACTION in message and message[ACTION] == MESSAGE and DESTINATION in message and TIME in message \
+                and SENDER in message and MESSAGE_TEXT in message:
+            self.messages.append(message)
+            return
+
+        elif ACTION in message and message[ACTION] == EXIT and ACCOUNT_NAME in message:
+            self.clients.remove(self.names[ACCOUNT_NAME])
+            self.names[ACCOUNT_NAME].close()
+            del self.names[ACCOUNT_NAME]
+            self.database.user_logout(message[ACCOUNT_NAME])
+            self.clients.remove(self.names[message[ACCOUNT_NAME]])
+            self.names[message[ACCOUNT_NAME]].close()
+            del self.names[message[ACCOUNT_NAME]]
+            return
+
         else:
-            listen_port = CONFIGURATIONS.get('DEFAULT_PORT')
-        if not 65535 >= listen_port >= 1024:
-            SERVER_LOGGER.error("Ошибка в номере порта")
-            raise ValueError
+            response = RESPONSE_400
+            response[ERROR] = 'Запрос некорректен.'
+            send_message(client, response)
+            return
 
-    except IndexError:
-        SERVER_LOGGER.error("нет порта")
-        print('После -\'p\' необходимо указать порт')
-        sys.exit(1)
 
-    except ValueError:
-        SERVER_LOGGER.error("Номер порта за пределами значений")
-        print(
-            'Значение порта должно быть в пределах от 1024 до 65535')
-        sys.exit(1)
-
-def checkaddress():
-    try:
-        if '-a' in sys.argv:
-            listen_address = sys.argv[sys.argv.index('-a') + 1]
-        else:
-            listen_address = ''
-   SERVER_LOGGER.critical("Не указан адрес")
-    except IndexError:
-        print(
-            'После \'a\'- необходимо указать адрес для ')
-        sys.exit(1)
-
-def messageexchange():
-    transport = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    transport.bind((listen_address, listen_port))
-
-    transport.listen(CONFIGURATIONS.get('MAX_CONNECTIONS'))
-
-    while True:
-        client, client_address = transport.accept()
-        try:
-            message = get_message(client, CONFIGURATIONS)
-            response_message = handle_message(message)
-            send_message(client, response_message, CONFIGURATIONS)
-            client.close()
-
-        except (ValueError, json.JSONDecodeError):
-            SERVER_LOGGER.error("Некорректное сообщение от клиента")
-            print('Принято некорретное сообщение от клиента')
-            client.close()
-
+def print_help():
+    print('Поддерживаемые комманды:')
+    print('users - список известных пользователей')
+    print('connected - список подключенных пользователей')
+    print('loghist - история входов пользователя')
+    print('exit - завершение работы сервера.')
+    print('help - вывод справки по поддерживаемым командам')
 
 
 def main():
-    global CONFIGURATIONS
-    CONFIGURATIONS = load_configuration()
-    checkport()
-    checkaddress()
-    messageexchange()
+    listen_address, listen_port = arg_parser()
+
+    server = Server(listen_address, listen_port)
+    server.main_loop()
+
+    database = ServerStorage()
+
+
+    server = Server(listen_address, listen_port, database)
+    server.daemon = True
+    server.start()
+
+    # Печатаем справку:
+    print_help()
+
+
+    while True:
+        command = input('Введите комманду: ')
+        if command == 'help':
+            print_help()
+        elif command == 'exit':
+            break
+        elif command == 'users':
+            for user in sorted(database.users_list()):
+                print(f'Пользователь {user[0]}, последний вход: {user[1]}')
+        elif command == 'connected':
+            for user in sorted(database.active_users_list()):
+                print(f'Пользователь {user[0]}, подключен: {user[1]}:{user[2]}, время установки соединения: {user[3]}')
+        elif command == 'loghist':
+            name = input(
+                'Введите имя пользователя для просмотра истории. Для вывода всей истории, просто нажмите Enter: ')
+            for user in sorted(database.login_history(name)):
+                print(f'Пользователь: {user[0]} время входа: {user[1]}. Вход с: {user[2]}:{user[3]}')
+        else:
+            print('Команда не распознана.')
+
 
 if __name__ == '__main__':
     main()
-
-

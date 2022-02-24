@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import variables
 
 def load_authentification(on_server=True):
     if not os.path.exists('../auth.json'):

@@ -12,5 +12,6 @@
   "AUTHENTICATE": "authenticate",
   "PASSWORD": "password",
   "RESPONSE": "response",
-  "ERROR": "error"
+  "ERROR": "error",
+  "SERVER_DATABASE" : 'sqlite:///server_base.db3'
 }
